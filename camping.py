@@ -10,7 +10,7 @@ from itertools import count, groupby
 
 import requests
 from fake_useragent import UserAgent
-
+ua = UserAgent(verify_ssl=False)
 
 LOG = logging.getLogger(__name__)
 formatter = logging.Formatter("%(asctime)s - %(process)s - %(levelname)s - %(message)s")
@@ -29,7 +29,7 @@ ISO_DATE_FORMAT_RESPONSE = "%Y-%m-%dT00:00:00Z"
 SUCCESS_EMOJI = "🏕"
 FAILURE_EMOJI = "❌"
 
-headers = {"User-Agent": UserAgent().random}
+headers = {"User-Agent": ua.random}
 
 
 def format_date(date_object, format_string=ISO_DATE_FORMAT_REQUEST):
