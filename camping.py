@@ -197,9 +197,10 @@ def execute_check_every_min(start_date, end_date, parks, campsite_type=None, nig
     count = 1
     try:
         availabilities = get_availabilities(start_date, end_date, parks, campsite_type, nights)
-        LOG.info("Total # of tries: " + str(count))
-        if not availabilities:
+        
+        while not availabilities:
             time.sleep(60)
+            LOG.info("Total # of tries: " + str(count))
             availabilities = get_availabilities(start_date, end_date, parks, campsite_type, nights)
             count += 1
         return availabilities
