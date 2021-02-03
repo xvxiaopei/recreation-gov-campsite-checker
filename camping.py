@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-
+# -*- coding: utf-8 -*- 
 import argparse
 import json
 import logging
 import sys
+import time
 from datetime import date, datetime, timedelta
 from dateutil import rrule
 from itertools import count, groupby
@@ -150,112 +151,58 @@ def consecutive_nights(available, nights):
     return len(longest_consecutive) >= nights
 
 
-def main(parks):
+def get_availabilities(start_date, end_date, parks, campsite_type=None, nights=None):
     out = []
     availabilities = False
     for park_id in parks:
-        park_information = get_park_information(
-            park_id, args.start_date, args.end_date, args.campsite_type
-        )
+        park_information = get_park_information(park_id, start_date, end_date, campsite_type)
         LOG.debug(
             "Information for park {}: {}".format(
                 park_id, json.dumps(park_information, indent=2)
             )
         )
         name_of_site = get_name_of_site(park_id)
-        current, maximum = get_num_available_sites(
-            park_information, args.start_date, args.end_date, nights=args.nights
-        )
+        current, maximum = get_num_available_sites(park_information, start_date, end_date, nights)
         if current:
             emoji = SUCCESS_EMOJI
             availabilities = True
         else:
             emoji = FAILURE_EMOJI
 
-        out.append(
+        LOG.info(
             "{} {} ({}): {} site(s) available out of {} site(s)".format(
                 emoji, name_of_site, park_id, current, maximum
             )
         )
 
     if availabilities:
-        print(
-            "There are campsites available from {} to {}!!!".format(
-                args.start_date.strftime(INPUT_DATE_FORMAT),
-                args.end_date.strftime(INPUT_DATE_FORMAT),
-            )
-        )
-    else:
-        print("There are no campsites available :(")
-    print("\n".join(out))
-    return availabilities
+        out =  "{} {} ({}): {} site(s) available out of {} site(s)".format(
+                emoji, name_of_site, park_id, current, maximum
+            ) + "\nThere are campsites available from {} to {}!!!".format(
+                start_date.strftime(INPUT_DATE_FORMAT),
+                end_date.strftime(INPUT_DATE_FORMAT))
+        LOG.info(out)
+        return out
+    return False
 
 
-def valid_date(s):
+def execute_check_every_min(start_date, end_date, parks, campsite_type=None, nights=None):
+    LOG.setLevel(logging.INFO)
+    LOG.info("Start checking availabilities every minute with start_date: "
+        + str(start_date)
+        + " end_date: " + str(end_date)
+        + " parks: " + str(parks)
+        + " campsite_type: " + str(campsite_type)
+        + " nights: " + str(nights))
+    count = 1
     try:
-        return datetime.strptime(s, INPUT_DATE_FORMAT)
-    except ValueError:
-        msg = "Not a valid date: '{0}'.".format(s)
-        raise argparse.ArgumentTypeError(msg)
-
-def positive_int(i):
-    i = int(i)
-    if i <= 0:
-        msg = "Not a valid number of nights: {0}".format(i)
-        raise argparse.ArgumentTypeError(msg)
-    return i
-
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--debug", "-d", action="store_true", help="Debug log level")
-    parser.add_argument(
-        "--start-date", required=True, help="Start date [YYYY-MM-DD]", type=valid_date
-    )
-    parser.add_argument(
-        "--end-date",
-        required=True,
-        help="End date [YYYY-MM-DD]. You expect to leave this day, not stay the night.",
-        type=valid_date,
-    )
-    parser.add_argument(
-        "--nights",
-        help="Number of consecutive nights (default is all nights in the given range).",
-        type=positive_int,
-    )
-    parser.add_argument(
-        "--campsite-type",
-        help=(
-            'If you want to filter by a type of campsite. For example '
-            '"STANDARD NONELECTRIC" or TODO'
-        ),
-    )
-    parks_group = parser.add_mutually_exclusive_group(required=True)
-    parks_group.add_argument(
-        "--parks",
-        dest="parks",
-        metavar="park",
-        nargs="+",
-        help="Park ID(s)",
-        type=int,
-    )
-    parks_group.add_argument(
-        "--stdin",
-        "-",
-        action="store_true",
-        help="Read list of park ID(s) from stdin instead",
-    )
-
-    args = parser.parse_args()
-
-    if args.debug:
-        LOG.setLevel(logging.DEBUG)
-
-    parks = args.parks or [p.strip() for p in sys.stdin]
-
-    try:
-        code = 0 if main(parks) else 1
-        sys.exit(code)
+        availabilities = get_availabilities(start_date, end_date, parks, campsite_type, nights)
+        LOG.info("Total # of tries: " + str(count))
+        if not availabilities:
+            time.sleep(60)
+            availabilities = get_availabilities(start_date, end_date, parks, campsite_type, nights)
+            count += 1
+        return availabilities
     except Exception:
         print("Something went wrong")
         LOG.exception("Something went wrong")
